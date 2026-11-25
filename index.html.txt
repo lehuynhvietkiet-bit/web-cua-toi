@@ -1,0 +1,1231 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>C-TAS Chennai Port - Auto-Synced Ergonomic App & Control Center</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+    body { font-family: 'Inter', sans-serif; background-color: #0b1120; color: #f8fafc; }
+
+    /* Khung điện thoại chuẩn Ergonomic */
+    .phone-shell {
+      width: 385px;
+      min-height: 760px;
+      border: 12px solid #1e293b;
+      border-radius: 44px;
+      background: #f8fafc;
+      color: #0f172a;
+      box-shadow: 0 25px 60px rgba(0,0,0,0.65), 0 0 0 2px #334155;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      transition: all 0.3s ease;
+    }
+    .phone-notch {
+      width: 140px;
+      height: 22px;
+      background: #1e293b;
+      border-radius: 0 0 16px 16px;
+      margin: 0 auto;
+    }
+
+    /* Touch Cards cho tài xế bấm 1 chạm */
+    .touch-card {
+      transition: all 0.18s ease;
+      cursor: pointer;
+      user-select: none;
+    }
+    .touch-card:active {
+      transform: scale(0.97);
+    }
+    .touch-card.selected {
+      border-color: #2563eb;
+      background-color: #eff6ff;
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.18);
+    }
+
+    /* Hiệu ứng nhấp nháy cảnh báo 34s */
+    @keyframes pulse-border {
+      0%, 100% { border-color: #f59e0b; background-color: #fffbeb; }
+      50% { border-color: #dc2626; background-color: #fef2f2; }
+    }
+    .warning-blink {
+      animation: pulse-border 1.8s infinite;
+    }
+
+    /* Giả lập QR sắc nét */
+    .qr-box {
+      background-image:
+        radial-gradient(#0f172a 2.5px, transparent 2.5px),
+        radial-gradient(#0f172a 2.5px, #ffffff 2.5px);
+      background-size: 18px 18px;
+      background-position: 0 0, 9px 9px;
+    }
+  </style>
+</head>
+<body class="p-3 md:p-6">
+
+  <!-- ==================== THANH ĐIỀU HƯỚNG 2 TAB TRÊN CÙNG ==================== -->
+  <header class="max-w-7xl mx-auto mb-5 bg-slate-900/95 border border-slate-700/80 rounded-2xl p-4 shadow-2xl">
+    <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+      <div>
+        <div class="flex items-center gap-2 text-xs font-extrabold uppercase tracking-wider text-blue-400">
+          <i class="fa-solid fa-ship"></i> CHƯƠNG 3: DETAILED DESIGN & PROTOTYPE | GVHD: TS. NGUYỄN ĐÌNH SƠN
+        </div>
+        <h1 class="text-lg md:text-2xl font-black text-white mt-0.5">
+          HỆ THỐNG C-TAS CẢNG CHENNAI (ERGONOMIC APP & WEB CONTROL)
+        </h1>
+        <p class="text-xs text-slate-400">
+          SVTH: Lê Huỳnh Viết Kiệt (103240185) & Nguyễn Hà Nam (103240188) — Tự động đồng bộ 100% Biển số ↔ Loại xe ↔ Cổng ↔ Web Điều độ
+        </p>
+      </div>
+
+      <!-- 2 NÚT CHUYỂN CHẾ ĐỘ (TABS) CHÍNH -->
+      <div class="flex flex-wrap gap-2.5 w-full lg:w-auto">
+        <button id="mainTab1" onclick="switchMainTab('driver')" class="flex-1 lg:flex-initial flex items-center justify-center gap-2.5 px-5 py-3 rounded-xl font-extrabold text-xs md:text-sm bg-blue-600 text-white shadow-lg shadow-blue-600/30 border border-blue-400 transition">
+          <i class="fa-solid fa-mobile-screen-button text-base"></i>
+          <span>TAB 1: GIAO DIỆN APP TÀI XẾ (CABIN 1 CHẠM)</span>
+        </button>
+        <button id="mainTab2" onclick="switchMainTab('operator')" class="flex-1 lg:flex-initial flex items-center justify-center gap-2.5 px-5 py-3 rounded-xl font-extrabold text-xs md:text-sm bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-600 transition relative">
+          <i class="fa-solid fa-desktop text-base"></i>
+          <span>TAB 2: WEB ĐIỀU ĐỘ CẢNG (ĐỒNG BỘ TỨC THỜI)</span>
+          <span id="syncBadgeDot" class="px-2 py-0.5 bg-emerald-500 text-slate-950 font-black text-[10px] rounded-full">
+            LIVE SYNC
+          </span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto">
+
+    <!-- ======================================================================== -->
+    <!-- TAB 1: GIAO DIỆN APP TÀI XẾ (MẶC ĐỊNH MỞ CẢ 3 MÀN HÌNH ĐỂ DỄ CHỤP ẢNH)   -->
+    <!-- ======================================================================== -->
+    <section id="sectionDriver" class="block">
+
+      <!-- THANH CÔNG CỤ GIẢ LẬP KỊCH BẢN (ĐIỂM ĂN TIỀN KHI DEMO CHO THẦY SƠN) -->
+      <div class="bg-slate-800/90 border border-slate-600 rounded-2xl p-4 mb-6 shadow-xl">
+        <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+          <div>
+            <span class="text-[11px] font-extrabold uppercase tracking-wider text-amber-400 block">
+              <i class="fa-solid fa-sliders mr-1"></i> BẢNG CÔNG TẮC GIẢ LẬP KỊCH BẢN DEMO (TỰ ĐỘNG ĐỒNG BỘ 2 CHIỀU)
+            </span>
+            <p class="text-xs text-slate-300 mt-0.5">
+              Khi bấm chọn <b>Loại xe 1 / 2 / 3</b>, hệ thống tự động gán đúng <b>Biển số xe chuẩn</b> và đồng bộ tức thời sang cả <b>Màn hình 3</b> lẫn <b>Tab 2 Web Điều độ</b>!
+            </p>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+            <!-- Công tắc 1: Hồ sơ Hợp lệ vs Hồ sơ Lỗi -->
+            <button id="simDocBtn" onclick="toggleSimDoc()" class="flex items-center gap-2 px-3.5 py-2 rounded-xl font-extrabold text-xs bg-emerald-500/20 border-2 border-emerald-500 text-emerald-300 transition">
+              <i class="fa-solid fa-toggle-on text-base"></i>
+              <span>Kịch bản Chứng từ: <b>HỢP LỆ (XANH)</b></span>
+            </button>
+
+            <!-- Công tắc 2: Container Sẵn sàng vs Chưa sẵn sàng -->
+            <button id="simContBtn" onclick="toggleSimCont()" class="flex items-center gap-2 px-3.5 py-2 rounded-xl font-extrabold text-xs bg-emerald-500/20 border-2 border-emerald-500 text-emerald-300 transition">
+              <i class="fa-solid fa-box-open text-base"></i>
+              <span>Trạng thái Cont: <b>ĐÃ HẠ BÃI (XANH)</b></span>
+            </button>
+
+            <!-- Công tắc 3: Chế độ hiển thị 3 màn hình hoặc thu gọn 1 điện thoại -->
+            <button id="viewModeBtn" onclick="togglePhoneViewMode()" class="flex items-center gap-2 px-3.5 py-2 rounded-xl font-bold text-xs bg-slate-700 hover:bg-slate-600 text-white border border-slate-500 transition">
+              <i class="fa-solid fa-mobile-screen"></i>
+              <span id="viewModeText">Thu gọn về 1 Điện thoại ở giữa</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- THANH CHỌN BƯỚC 1 - 2 - 3 (CHỈ HIỆN KHI THU GỌN VỀ 1 ĐIỆN THOẠI) -->
+      <div id="wizardStepBar" class="hidden max-w-md mx-auto mb-5 grid grid-cols-3 gap-2 bg-slate-900 p-1.5 rounded-2xl border border-slate-700">
+        <button id="stepTab1" onclick="goToStep(1)" class="py-2 px-2 rounded-xl font-extrabold text-xs bg-blue-600 text-white shadow">
+          Bước 1: Khai báo 3 chạm
+        </button>
+        <button id="stepTab2" onclick="goToStep(2)" class="py-2 px-2 rounded-xl font-bold text-xs text-slate-400 hover:text-white">
+          Bước 2: Chọn Slot giờ
+        </button>
+        <button id="stepTab3" onclick="goToStep(3)" class="py-2 px-2 rounded-xl font-bold text-xs text-slate-400 hover:text-white">
+          Bước 3: Vé e-Pass & Lộ trình
+        </button>
+      </div>
+
+      <!-- KHU VỰC HIỂN THỊ 3 ĐIỆN THOẠI SONG SONG -->
+      <div id="phonesWrapper" class="flex flex-wrap justify-center items-start gap-7 py-1">
+
+        <!-- ================================================================== -->
+        <!-- MÀN HÌNH 1: KHAI BÁO 3 CHẠM & SÀNG LỌC CHỨNG TỪ 2 LỚP (ERGONOMIC)  -->
+        <!-- ================================================================== -->
+        <div id="screenStep1" class="phone-shell">
+          <div class="bg-slate-900 text-white px-4 pt-1 pb-3">
+            <div class="phone-notch mb-2"></div>
+            <div class="flex justify-between items-center text-[11px] text-slate-400 mb-1.5">
+              <span class="font-semibold">07:30 AM</span>
+              <span class="px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-bold text-[10px]">Khối A | SyR-1.2</span>
+              <span><i class="fa-solid fa-signal"></i> 5G <i class="fa-solid fa-battery-full text-emerald-400"></i></span>
+            </div>
+            <div class="flex items-center justify-between">
+              <div>
+                <h2 class="text-sm font-black tracking-wide uppercase text-white">CHENNAI PORT SMARTPASS</h2>
+                <p class="text-[11px] text-blue-300 font-medium">Bước 1/3: Khai báo 3 chạm trên Cabin</p>
+              </div>
+              <span class="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center font-black text-sm shadow">1/3</span>
+            </div>
+          </div>
+
+          <div class="p-3.5 flex-1 flex flex-col justify-between bg-slate-100 text-xs">
+            <div class="space-y-3">
+
+              <!-- Chọn nhanh Biển số xe (Tự động khớp 2 chiều với Loại xe 1-2-3) -->
+              <div class="bg-white p-2.5 rounded-2xl border border-slate-200 shadow-sm">
+                <div class="flex justify-between items-center mb-1.5">
+                  <span class="font-extrabold text-slate-700 text-[11px] uppercase">Biển số đầu kéo (Tự khớp Loại xe):</span>
+                  <span class="text-[10px] text-blue-600 font-bold"><i class="fa-solid fa-link"></i> Auto-Link</span>
+                </div>
+                <div class="grid grid-cols-3 gap-1.5">
+                  <button id="plateBtn1" onclick="selectTruckType(1)" class="py-1.5 px-1.5 rounded-xl border-2 border-blue-600 bg-blue-50 font-black text-[10px] text-blue-900 transition">
+                    TN-01-CH-4829<br><span class="text-[9px] font-semibold text-blue-600">(Cont Loại 1)</span>
+                  </button>
+                  <button id="plateBtn2" onclick="selectTruckType(2)" class="py-1.5 px-1.5 rounded-xl border border-slate-300 bg-slate-50 font-bold text-[10px] text-slate-700 transition">
+                    TN-04-AB-9012<br><span class="text-[9px] font-normal text-slate-500">(Liên bến L2)</span>
+                  </button>
+                  <button id="plateBtn3" onclick="selectTruckType(3)" class="py-1.5 px-1.5 rounded-xl border border-slate-300 bg-slate-50 font-bold text-[10px] text-slate-700 transition">
+                    TN-09-RORO-88<br><span class="text-[9px] font-normal text-slate-500">(Ro-Ro/Dầu L3)</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- CHẠM 1: Chọn Loại xe (truck_Type) bằng Touch Cards lớn -->
+              <div>
+                <label class="block font-extrabold text-slate-800 text-[11px] uppercase mb-1.5">
+                  <span class="bg-blue-600 text-white px-1.5 py-0.5 rounded mr-1">Chạm 1</span> Chọn Loại Phương Tiện (truck_Type):
+                </label>
+                <div class="space-y-1.5">
+                  <div onclick="selectTruckType(1)" id="cardType1" class="touch-card selected p-2.5 rounded-2xl border-2 bg-white flex items-center justify-between">
+                    <div class="flex items-center gap-2.5">
+                      <div class="w-9 h-9 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center text-base font-bold">
+                        <i class="fa-solid fa-truck-moving"></i>
+                      </div>
+                      <div>
+                        <div class="font-black text-slate-900 text-xs">Loại 1: Container Chuẩn (65%)</div>
+                        <div class="text-[10px] text-slate-500 font-medium">Biển: TN-01-CH-4829 • Vào Gate 0 (RFID)</div>
+                      </div>
+                    </div>
+                    <i id="checkType1" class="fa-solid fa-circle-check text-blue-600 text-base"></i>
+                  </div>
+
+                  <div onclick="selectTruckType(2)" id="cardType2" class="touch-card p-2.5 rounded-2xl border-2 border-slate-200 bg-white flex items-center justify-between">
+                    <div class="flex items-center gap-2.5">
+                      <div class="w-9 h-9 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center text-base font-bold">
+                        <i class="fa-solid fa-right-left"></i>
+                      </div>
+                      <div>
+                        <div class="font-black text-slate-900 text-xs">Loại 2: Chuyển Bến A ↔ B (20%)</div>
+                        <div class="text-[10px] text-slate-500 font-medium">Biển: TN-04-AB-9012 • Giãn cách 34s</div>
+                      </div>
+                    </div>
+                    <i id="checkType2" class="fa-regular fa-circle text-slate-300 text-base"></i>
+                  </div>
+
+                  <div onclick="selectTruckType(3)" id="cardType3" class="touch-card p-2.5 rounded-2xl border-2 border-slate-200 bg-white flex items-center justify-between">
+                    <div class="flex items-center gap-2.5">
+                      <div class="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-base font-bold">
+                        <i class="fa-solid fa-truck-droplet"></i>
+                      </div>
+                      <div>
+                        <div class="font-black text-slate-900 text-xs">Loại 3: Ro-Ro 60-80ft / Bồn Dầu (15%)</div>
+                        <div class="text-[10px] text-emerald-700 font-bold">Biển: TN-09-RORO-88 • Vào thẳng GATE 2 (35s)</div>
+                      </div>
+                    </div>
+                    <i id="checkType3" class="fa-regular fa-circle text-slate-300 text-base"></i>
+                  </div>
+                </div>
+              </div>
+
+              <!-- CHẠM 2: Nút gạt lớn Trạng thái tải (isload) -->
+              <div>
+                <label class="block font-extrabold text-slate-800 text-[11px] uppercase mb-1.5">
+                  <span class="bg-blue-600 text-white px-1.5 py-0.5 rounded mr-1">Chạm 2</span> Gạt Trạng Thái Tải Trọng (isload):
+                </label>
+                <div class="grid grid-cols-2 gap-2 bg-slate-200 p-1 rounded-2xl">
+                  <button id="toggleLoad1" onclick="selectLoadState(1)" class="py-2 px-3 rounded-xl bg-blue-600 text-white font-black text-xs shadow flex items-center justify-center gap-1.5 transition">
+                    <i class="fa-solid fa-boxes-stacked"></i> CÓ HÀNG (1)
+                  </button>
+                  <button id="toggleLoad0" onclick="selectLoadState(0)" class="py-2 px-3 rounded-xl text-slate-700 font-bold text-xs flex items-center justify-center gap-1.5 transition">
+                    <i class="fa-regular fa-square"></i> XE RỖNG (0)
+                  </button>
+                </div>
+              </div>
+
+              <!-- CHẠM 3: Chọn Điểm đến (Destination Cards) -->
+              <div>
+                <label class="block font-extrabold text-slate-800 text-[11px] uppercase mb-1.5">
+                  <span class="bg-blue-600 text-white px-1.5 py-0.5 rounded mr-1">Chạm 3</span> Chọn Điểm Đến Nội Bộ:
+                </label>
+                <div class="grid grid-cols-3 gap-1.5 text-center">
+                  <div onclick="selectDestination('TermA')" id="destCardA" class="touch-card selected p-2 rounded-xl border-2 bg-white">
+                    <div class="font-black text-xs text-slate-900">Terminal A</div>
+                    <div class="text-[10px] text-blue-700 font-bold">CCTL (Slip Road)</div>
+                  </div>
+                  <div onclick="selectDestination('TermB')" id="destCardB" class="touch-card p-2 rounded-xl border-2 border-slate-200 bg-white">
+                    <div class="font-black text-xs text-slate-900">Terminal B</div>
+                    <div class="text-[10px] text-slate-500 font-semibold">CITPL (22 Cẩu)</div>
+                  </div>
+                  <div onclick="selectDestination('Yards')" id="destCardY" class="touch-card p-2 rounded-xl border-2 border-slate-200 bg-white">
+                    <div class="font-black text-xs text-slate-900">Yards & Docks</div>
+                    <div class="text-[10px] text-slate-500 font-semibold">Ambedkar/Jawahar</div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- HỘP TÍN HIỆU KIỂM DUYỆT CHỨNG TỪ 2 LỚP + NÚT QUA BƯỚC 2 -->
+            <div class="mt-3 space-y-2">
+              <div id="docStatusBox" class="p-2.5 rounded-2xl bg-emerald-50 border-2 border-emerald-500 text-emerald-950 shadow-sm">
+                <div class="flex items-center justify-between">
+                  <span class="font-black text-xs text-emerald-700 flex items-center gap-1.5">
+                    <i class="fa-solid fa-circle-check text-sm"></i> [XANH LÁ] HỒ SƠ e-DO HỢP LỆ
+                  </span>
+                  <span class="text-[10px] bg-emerald-200 text-emerald-900 px-2 py-0.5 rounded-full font-extrabold">Pass 2 Lớp</span>
+                </div>
+                <p class="text-[10px] mt-1 leading-snug font-medium">
+                  Đã xác thực chữ ký Hải quan & EIR trước 120 phút (Không thuộc nhóm 3%–13% lỗi Trouble Transaction).
+                </p>
+              </div>
+
+              <button id="btnStep1Next" onclick="goToStep(2)" class="w-full py-2.5 rounded-2xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-black text-xs shadow-lg flex items-center justify-center gap-2 transition">
+                <span>TIẾP TỤC QUA BƯỚC 2: CHỌN GIỜ HẸN</span>
+                <i class="fa-solid fa-arrow-right"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ================================================================== -->
+        <!-- MÀN HÌNH 2: MÃ MÀU ĐÈN GIAO THÔNG & ĐẶT SLOT <= 60 XE/H (INTUITIVE)-->
+        <!-- ================================================================== -->
+        <div id="screenStep2" class="phone-shell">
+          <div class="bg-slate-900 text-white px-4 pt-1 pb-3">
+            <div class="phone-notch mb-2"></div>
+            <div class="flex justify-between items-center text-[11px] text-slate-400 mb-1.5">
+              <span class="font-semibold">07:32 AM</span>
+              <span class="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-bold text-[10px]">Khối A & C | SyR-1.1, 2.2</span>
+              <span><i class="fa-solid fa-signal"></i> 5G <i class="fa-solid fa-battery-full text-emerald-400"></i></span>
+            </div>
+            <div class="flex items-center justify-between">
+              <div>
+                <h2 class="text-sm font-black tracking-wide uppercase text-white">TÍN HIỆU BÃI & CHỌN KHUNG GIỜ</h2>
+                <p class="text-[11px] text-indigo-300 font-medium">Bước 2/3: Đèn giao thông Trực quan (Xanh-Vàng-Đỏ)</p>
+              </div>
+              <span class="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center font-black text-sm shadow">2/3</span>
+            </div>
+          </div>
+
+          <div class="p-3.5 flex-1 flex flex-col justify-between bg-slate-100 text-xs">
+            <div class="space-y-3">
+
+              <!-- THẺ TRẠNG THÁI CONTAINER THỜI GIAN THỰC (ĐÈN GIAO THÔNG) -->
+              <div id="contTrafficCard" class="p-3 rounded-2xl bg-emerald-50 border-2 border-emerald-500 shadow-sm">
+                <div class="flex justify-between items-center mb-1">
+                  <span class="text-[10px] font-black uppercase text-emerald-800 tracking-wide">
+                    <i class="fa-solid fa-traffic-light mr-1"></i> TÍN HIỆU TỪ KHỐI C (BẾN BÃI)
+                  </span>
+                  <span id="contTrafficBadge" class="px-2 py-0.5 bg-emerald-600 text-white font-black rounded-full text-[10px]">
+                    [XANH] CHO PHÉP KHỞI HÀNH
+                  </span>
+                </div>
+                <div id="contCodeTitle" class="font-black text-slate-900 text-sm">
+                  Mã Cont: MSCU-928374-0
+                </div>
+                <div id="contLocationText" class="text-[11px] font-bold text-emerald-900 mt-0.5">
+                  ĐÃ HẠ BÃI TẠI TERMINAL A (Cẩu số 14/30)
+                </div>
+                <p id="contSubNote" class="text-[10px] text-emerald-800 mt-1 font-medium">
+                  ✓ Hàng đã sẵn sàng bốc xếp. Tài xế được phép chọn khung giờ vào cảng.
+                </p>
+              </div>
+
+              <!-- LƯỚI CHỌN KHUNG GIỜ (TIME-SLOT <= 60 XE/GIỜ) -->
+              <div>
+                <div class="flex justify-between items-center mb-1.5">
+                  <label class="font-extrabold text-slate-800 text-[11px] uppercase">
+                    Chạm Chọn Khung Giờ (Quota ≤ 60 xe/giờ):
+                  </label>
+                </div>
+
+                <div class="space-y-2.5">
+                  <!-- KHUNG 14:00 - 15:00 (MÀU XANH - CHẠM ĐỂ CHỌN) -->
+                  <div onclick="chooseTimeSlot('day')" id="slotCardDay" class="touch-card p-3 rounded-2xl border-2 border-emerald-600 bg-emerald-50 shadow-sm">
+                    <div class="flex justify-between items-center">
+                      <div class="flex items-center gap-2">
+                        <span class="w-3.5 h-3.5 rounded-full bg-emerald-500 inline-block"></span>
+                        <span class="font-black text-slate-900 text-xs">14:00 – 15:00 (Ca Ngày)</span>
+                      </div>
+                      <span id="daySlotCountBadge" class="px-2 py-0.5 rounded-lg bg-emerald-600 text-white font-black text-[10px]">
+                        XANH: 42 / 60 XE
+                      </span>
+                    </div>
+                    <div class="w-full bg-emerald-200 h-2 rounded-full mt-2 overflow-hidden">
+                      <div id="daySlotProgressBar" class="bg-emerald-600 h-full rounded-full transition-all duration-300" style="width: 70%"></div>
+                    </div>
+                    <div class="flex justify-between items-center mt-1.5 text-[10px] font-bold text-emerald-900">
+                      <span id="daySlotStatusText">✓ ĐANG CHỌN — Đã đồng bộ sang Vé e-Pass</span>
+                      <span id="dayRemainingText">Còn 18 chỗ trống</span>
+                    </div>
+                  </div>
+
+                  <!-- KHUNG CAO ĐIỂM 17:00 - 18:00 (MÀU ĐỎ KHÓA CỨNG - CHẶN ĐỈNH 103 XE/H) -->
+                  <div onclick="notifyLockedPeak()" class="p-3 rounded-2xl border-2 border-red-400 bg-red-50 opacity-95 cursor-not-allowed">
+                    <div class="flex justify-between items-center">
+                      <div class="flex items-center gap-2">
+                        <span class="w-3.5 h-3.5 rounded-full bg-red-600 inline-block"></span>
+                        <span class="font-black text-red-950 text-xs">17:00 – 18:00 (Giờ Cao Điểm)</span>
+                      </div>
+                      <span class="px-2 py-0.5 rounded-lg bg-red-600 text-white font-black text-[10px]">
+                        <i class="fa-solid fa-lock mr-1"></i>ĐỎ: 60 / 60 XE
+                      </span>
+                    </div>
+                    <div class="w-full bg-red-200 h-2 rounded-full mt-2 overflow-hidden">
+                      <div class="bg-red-600 h-full rounded-full" style="width: 100%"></div>
+                    </div>
+                    <p class="text-[10px] text-red-800 mt-1.5 font-extrabold">
+                      ✗ KHÓA CỨNG: Đầy tải (Ngăn chặn đỉnh ùn tắc 103 xe/giờ theo Paper 198)
+                    </p>
+                  </div>
+
+                  <!-- KHUNG CA ĐÊM 22:00 - 05:00 (NGÔI SAO ƯU TIÊN - MỞ THẲNG CỔNG 10) -->
+                  <div onclick="chooseTimeSlot('night')" id="slotCardNight" class="touch-card p-3 rounded-2xl border-2 border-amber-400 bg-amber-50/80 shadow-sm">
+                    <div class="flex justify-between items-center">
+                      <div class="flex items-center gap-1.5">
+                        <i class="fa-solid fa-star text-amber-500 text-sm"></i>
+                        <span class="font-black text-slate-900 text-xs">22:00 – 05:00 (Ca Đêm Ưu Tiên)</span>
+                      </div>
+                      <span id="nightSlotCountBadge" class="px-2 py-0.5 rounded-lg bg-indigo-600 text-white font-black text-[10px]">
+                        MỞ GATE 10 (18/60)
+                      </span>
+                    </div>
+                    <p class="text-[10px] text-indigo-950 font-bold mt-1.5 leading-snug">
+                      ★ ƯU TIÊN: Mở thẳng <b>Cổng 10</b> – Chờ <b>&lt; 1 phút</b> (Khớp hàm <code>AMOD(TNOW,24)&gt;=22 .OR. &lt;5</code> trong Arena).
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Hộp thông báo phản hồi nhanh -->
+            <div id="step2AlertBox" class="hidden p-2 rounded-xl text-[10px] font-extrabold text-center"></div>
+
+            <!-- Nút điều hướng Bước 2 -->
+            <div class="mt-2 flex gap-2">
+              <button onclick="goToStep(1)" class="w-1/3 py-2.5 rounded-2xl bg-slate-200 hover:bg-slate-300 text-slate-800 font-extrabold text-xs">
+                <i class="fa-solid fa-arrow-left mr-1"></i> Bước 1
+              </button>
+              <button id="btnConfirmPass" onclick="issueSmartPass()" class="w-2/3 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black text-xs shadow-lg flex items-center justify-center gap-1.5 transition">
+                <i class="fa-solid fa-qrcode"></i> NHẬN VÉ e-PASS MỚI (+1 XE)
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ================================================================== -->
+        <!-- MÀN HÌNH 3: VÉ e-PASS ĐỊNH TUYẾN TỰ ĐỘNG & ĐỒNG HỒ 34 GIÂY          -->
+        <!-- ================================================================== -->
+        <div id="screenStep3" class="phone-shell">
+          <div class="bg-slate-900 text-white px-4 pt-1 pb-3">
+            <div class="phone-notch mb-2"></div>
+            <div class="flex justify-between items-center text-[11px] text-slate-400 mb-1.5">
+              <span class="font-semibold">07:35 AM</span>
+              <span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold text-[10px]">Khối B & D | SyR-2.1, 3.2</span>
+              <span><i class="fa-solid fa-signal"></i> 5G <i class="fa-solid fa-battery-full text-emerald-400"></i></span>
+            </div>
+            <div class="flex items-center justify-between">
+              <div>
+                <h2 class="text-sm font-black tracking-wide uppercase text-white">THẺ e-PASS & LỘ TRÌNH SLIP ROAD</h2>
+                <p class="text-[11px] text-emerald-300 font-medium">Bước 3/3: Định tuyến Cổng & Giãn cách 34s</p>
+              </div>
+              <span class="w-9 h-9 rounded-xl bg-emerald-600 flex items-center justify-center font-black text-sm shadow">3/3</span>
+            </div>
+          </div>
+
+          <div class="p-3.5 flex-1 flex flex-col justify-between bg-slate-100 text-xs">
+            <div class="space-y-2.5">
+
+              <!-- KHU VỰC MÃ QR & TỰ ĐỘNG CHỈ ĐỊNH CỔNG VÀO (SMART GATE ASSIGNMENT) -->
+              <div class="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm">
+                <div class="flex justify-between items-center text-[10px] font-extrabold text-slate-600 mb-1.5">
+                  <span id="passHeaderPlate" class="text-slate-900 font-black">XE: TN-01-CH-4829 (CÓ HÀNG)</span>
+                  <span id="passRfidBadge" class="text-emerald-600"><i class="fa-solid fa-wifi"></i> RFID UHF ACTIVE</span>
+                </div>
+
+                <div class="flex items-center gap-3">
+                  <!-- Mã QR -->
+                  <div class="w-20 h-20 border-4 border-slate-900 rounded-xl p-1.5 flex flex-col justify-between qr-box shrink-0">
+                    <div class="flex justify-between">
+                      <span class="w-3.5 h-3.5 border-2 border-slate-900 bg-white block"></span>
+                      <span class="w-3.5 h-3.5 border-2 border-slate-900 bg-white block"></span>
+                    </div>
+                    <div id="qrPassId" class="bg-slate-900 text-white text-[8px] font-black text-center py-0.5 rounded">
+                      PASS-889
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="w-3.5 h-3.5 border-2 border-slate-900 bg-white block"></span>
+                      <span class="w-3.5 h-3.5 bg-emerald-500 block"></span>
+                    </div>
+                  </div>
+
+                  <!-- Hộp Tự động chỉ định cổng (Thay đổi theo Loại xe & Khung giờ) -->
+                  <div id="smartGateBox" class="flex-1 p-2.5 rounded-xl bg-blue-50 border-2 border-blue-600 text-blue-950">
+                    <div class="text-[10px] font-extrabold uppercase text-blue-600">Cổng vào chỉ định tự động:</div>
+                    <div id="smartGateTitle" class="font-black text-xs text-blue-900 mt-0.5">
+                      VÀO GATE 0 – Làn đọc thẻ RFID tự động (≤ 1.0 phút)
+                    </div>
+                    <div id="smartGateSub" class="text-[10px] font-semibold text-slate-700 mt-0.5">
+                      Khung hẹn: 14:00–15:00 | Không cần dừng xuất trình giấy tờ
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- THANH TIẾN TRÌNH DỌC (STEP-BY-STEP ROUTE) RÕ RÀNG -->
+              <div class="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm">
+                <div class="flex justify-between items-center mb-2">
+                  <span class="font-black text-slate-900 text-[11px] uppercase">
+                    <i class="fa-solid fa-route text-emerald-600 mr-1"></i>Thanh Lộ Trình Từng Chặng:
+                  </span>
+                  <span id="routeTotalTimeBadge" class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-black text-[10px]">
+                    Tổng thoát cảng: 52 phút
+                  </span>
+                </div>
+
+                <div id="verticalStepper" class="relative pl-4 border-l-2 border-blue-500 space-y-2 text-[11px]">
+                  <!-- Chặng 1 -->
+                  <div class="relative">
+                    <span class="w-2.5 h-2.5 rounded-full bg-blue-600 absolute -left-[21px] top-1"></span>
+                    <span id="stepRoute1" class="font-bold text-slate-800">1. <b>Gate 0 In</b> (Quét thẻ RFID tự động &lt; 2s)</span>
+                  </div>
+                  <!-- Chặng 2 -->
+                  <div class="relative">
+                    <span class="w-2.5 h-2.5 rounded-full bg-blue-600 absolute -left-[21px] top-1"></span>
+                    <span id="stepRoute2" class="font-bold text-slate-800">2. <b>Booth A In</b> → Vị trí Cẩu #14/30 → <b>Booth A Out</b></span>
+                  </div>
+                  <!-- Chặng 3: Đường nhánh Slip Road nổi bật -->
+                  <div id="stepRoute3Box" class="relative bg-emerald-50 border border-emerald-400 p-1.5 rounded-lg">
+                    <span class="w-3 h-3 rounded-full bg-emerald-600 absolute -left-[22px] top-2"></span>
+                    <span id="stepRoute3Title" class="font-black text-emerald-900 block">
+                      3. Rẽ vào ĐƯỜNG NHÁNH 2 LÀN (SLIP ROAD)
+                    </span>
+                    <span id="stepRoute3Sub" class="text-[10px] text-emerald-700 font-semibold">
+                      Tách khỏi luồng xếp hàng vào Terminal B (Giảm từ 1h45p xuống 52p)
+                    </span>
+                  </div>
+                  <!-- Chặng 4 -->
+                  <div class="relative">
+                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-600 absolute -left-[21px] top-1"></span>
+                    <span id="stepRoute4" class="font-bold text-slate-800">
+                      4. Bốt kiểm tra so le <b>Staggered Booth #3</b> → <b>Gate 0 Exit</b>
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- ĐỒNG HỒ ĐẾM NGƯỢC 34 GIÂY & HỘP CẢNH BÁO NHẤP NHÁY -->
+              <div class="warning-blink p-2.5 rounded-2xl border-2 flex items-center justify-between gap-2">
+                <div class="flex items-center gap-2">
+                  <div class="w-10 h-10 rounded-xl bg-red-600 text-white flex flex-col items-center justify-center shrink-0 shadow">
+                    <span id="countdown34" class="font-black text-sm leading-none">34s</span>
+                    <span class="text-[8px] font-bold uppercase">Giãn cách</span>
+                  </div>
+                  <div class="text-[10px] leading-snug text-slate-900 font-extrabold">
+                    Giữ giãn cách an toàn 34 giây (Delay Separation) – Cấm dừng đỗ quá 3 phút trên đường nội bộ!
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- Nút chuyển nhanh sang Tab 2 Web Điều độ để xem đồng bộ -->
+            <div class="mt-2 flex gap-2">
+              <button onclick="goToStep(1)" class="w-1/3 py-2.5 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-[11px]">
+                <i class="fa-solid fa-rotate-left mr-1"></i> Khai báo lại
+              </button>
+              <button onclick="switchMainTab('operator')" class="w-2/3 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-amber-300 font-black text-[11px] shadow flex items-center justify-center gap-1.5">
+                <i class="fa-solid fa-desktop"></i> XEM ĐỒNG BỘ TRÊN WEB CẢNG
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ======================================================================== -->
+    <!-- TAB 2: GIAO DIỆN WEB ĐIỀU ĐỘ CẢNG (TOÀN MÀN HÌNH - ĐỒNG BỘ TỨC THỜI)     -->
+    <!-- ======================================================================== -->
+    <section id="sectionOperator" class="hidden">
+      <div class="bg-slate-900 border-2 border-slate-700 rounded-2xl overflow-hidden shadow-2xl">
+
+        <!-- Thanh trạng thái trên cùng của Trung tâm Điều độ -->
+        <div class="bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 px-6 py-4 border-b border-slate-700 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="w-3 h-3 rounded-full bg-emerald-400 animate-ping"></span>
+              <span class="text-xs font-extrabold uppercase tracking-widest text-emerald-400">
+                AUTO LIVE-SYNC FROM SMARTPASS APP | KHỐI B, C, D
+              </span>
+            </div>
+            <h2 class="text-lg md:text-xl font-black text-white mt-0.5">
+              TRUNG TÂM ĐIỀU ĐỘ CẢNG CHENNAI (C-TAS PORT CONTROL DASHBOARD)
+            </h2>
+          </div>
+
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 w-full lg:w-auto text-xs">
+            <div class="bg-slate-800 border border-slate-600 px-3.5 py-2 rounded-xl">
+              <span class="text-slate-400 block text-[10px] font-bold">THÔNG LƯỢNG 48H (PAPER 198)</span>
+              <span id="opTotalThroughput" class="font-black text-emerald-400 text-sm">2,328 / 2,345 xe (99.2%)</span>
+            </div>
+            <div class="bg-slate-800 border border-slate-600 px-3.5 py-2 rounded-xl">
+              <span class="text-slate-400 block text-[10px] font-bold">XE LỖI ĐÃ CHẶN TỪ XA</span>
+              <span id="opBlockedCount" class="font-black text-red-400 text-sm">100% Nhóm 3%–13% Lỗi</span>
+            </div>
+            <div class="bg-slate-800 border-2 border-amber-400 px-3.5 py-2 rounded-xl col-span-2 sm:col-span-1">
+              <span class="text-amber-300 block text-[10px] font-bold">VÉ e-PASS VỪA ĐỒNG BỘ TỨC THỜI</span>
+              <span id="opLastSyncedTruck" class="font-black text-white text-sm">TN-01-CH-4829 → GATE 0 (RFID)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Nội dung 3 Phân khu trên Web Điều độ -->
+        <div class="p-5 grid grid-cols-1 lg:grid-cols-12 gap-5">
+
+          <!-- PHÂN KHU 1: SỐ XE Ở CỔNG 0, 2, 10 & 5 BỐT SO LE STAGGERED BOOTHS (5 CỘT) -->
+          <div class="lg:col-span-5 bg-slate-800/80 border border-slate-700 rounded-2xl p-4 space-y-3.5">
+            <div class="flex justify-between items-center border-b border-slate-700 pb-2.5">
+              <h3 class="text-sm font-black text-blue-300 uppercase">
+                <i class="fa-solid fa-torii-gate mr-1.5"></i>1. Giám sát Cổng 0, 2, 10 & 5 Bốt So le
+              </h3>
+              <span class="text-[10px] bg-blue-900 text-blue-200 px-2 py-0.5 rounded font-bold">Khối B | SyR-2.1, 2.2</span>
+            </div>
+
+            <!-- Cổng 0 + 5 Bốt Staggered Booths -->
+            <div id="opCardGate0" class="bg-slate-900 border-2 border-emerald-500 rounded-xl p-3.5 transition">
+              <div class="flex justify-between items-center">
+                <span class="font-black text-sm text-white">GATE 0 (Làn RFID Tự động 24/24)</span>
+                <span id="opGate0Count" class="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-black text-xs border border-emerald-500/40">
+                  684 xe (58%)
+                </span>
+              </div>
+              <p class="text-[11px] text-slate-300 mt-1">
+                Trạng thái <b>5 Bốt kiểm tra so le (Staggered Booths #1–#5)</b> trên 3 làn mở rộng (200m trước Gate 0 Exit):
+              </p>
+              <div class="grid grid-cols-5 gap-1.5 my-2.5 text-center text-[10px] font-black">
+                <div class="bg-emerald-600/30 border border-emerald-400 text-emerald-200 py-1.5 rounded-lg">Bốt #1<br>0.91p</div>
+                <div class="bg-emerald-600/30 border border-emerald-400 text-emerald-200 py-1.5 rounded-lg">Bốt #2<br>0.94p</div>
+                <div class="bg-emerald-600/30 border border-emerald-400 text-emerald-200 py-1.5 rounded-lg">Bốt #3<br>0.89p</div>
+                <div class="bg-emerald-600/30 border border-emerald-400 text-emerald-200 py-1.5 rounded-lg">Bốt #4<br>0.96p</div>
+                <div class="bg-emerald-600/30 border border-emerald-400 text-emerald-200 py-1.5 rounded-lg">Bốt #5<br>0.92p</div>
+              </div>
+              <div class="flex justify-between text-[11px] text-slate-300 pt-1 border-t border-slate-800">
+                <span>Xử lý gộp Hải quan + An ninh: <b class="text-emerald-400">≤ 1.0 phút/xe</b></span>
+                <span class="text-emerald-400 font-bold">✓ Xóa hệ số trễ 2.5x</span>
+              </div>
+            </div>
+
+            <!-- Cổng 2 -->
+            <div id="opCardGate2" class="bg-slate-900 border border-slate-700 rounded-xl p-3.5 transition">
+              <div class="flex justify-between items-center">
+                <span class="font-black text-sm text-white">GATE 2 (Luồng Loại 3: Ro-Ro / Bồn dầu)</span>
+                <span id="opGate2Count" class="px-2.5 py-0.5 rounded-full bg-blue-500/20 text-blue-300 font-black text-xs border border-blue-500/40">
+                  357 xe (33%)
+                </span>
+              </div>
+              <div class="text-[11px] text-slate-300 mt-1 flex justify-between">
+                <span>Hàng đợi thực tế: <b class="text-emerald-400">0.32 xe (Thông thoáng)</b></span>
+                <span>Thời gian qua cổng: <b class="text-white">35 giây</b></span>
+              </div>
+            </div>
+
+            <!-- Cổng 10 -->
+            <div id="opCardGate10" class="bg-slate-900 border border-indigo-500/40 rounded-xl p-3.5 transition">
+              <div class="flex justify-between items-center">
+                <span class="font-black text-sm text-indigo-300">GATE 10 (Ưu tiên Ca đêm 22:00 – 05:00)</span>
+                <span id="opGate10Count" class="px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-black text-xs border border-indigo-500/40">
+                  214 xe Cont
+                </span>
+              </div>
+              <div class="text-[11px] text-slate-300 mt-1">
+                Tự động mở khi <code>AMOD(TNOW, 24) &gt;= 22 .OR. &lt; 5</code>. Thời gian chờ dự kiến <b>&lt; 1 phút</b>.
+              </div>
+            </div>
+          </div>
+
+          <!-- PHÂN KHU 2: CÔNG SUẤT CẨU TERMINAL A/B & LỊCH XOAY CA 12H/17H/20H (7 CỘT) -->
+          <div class="lg:col-span-7 space-y-5">
+
+            <!-- Giám sát Cẩu & Hàng đợi Terminal A / B -->
+            <div class="bg-slate-800/80 border border-slate-700 rounded-2xl p-4">
+              <div class="flex justify-between items-center border-b border-slate-700 pb-2.5 mb-3">
+                <h3 class="text-sm font-black text-amber-300 uppercase">
+                  <i class="fa-solid fa-truck-ramp-box mr-1.5"></i>2. Đồng bộ Cẩu Bốc dỡ & Hàng đợi Terminal A/B (Arena)
+                </h3>
+                <span class="text-[10px] bg-amber-900 text-amber-200 px-2 py-0.5 rounded font-bold">Khối C | SyR-1.1</span>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="bg-slate-900 p-3.5 rounded-xl border border-slate-700">
+                  <div class="flex justify-between items-center mb-1.5">
+                    <span class="font-black text-xs text-white">TERMINAL A (CCTL - 30 Vị trí Cẩu)</span>
+                    <span class="text-emerald-400 font-black text-xs">26/30 Cẩu (87.4%)</span>
+                  </div>
+                  <div class="w-full bg-slate-700 h-3 rounded-full overflow-hidden mb-2">
+                    <div class="bg-emerald-500 h-full" style="width: 87.4%"></div>
+                  </div>
+                  <div class="text-[11px] text-slate-300">
+                    • Hàng đợi <code>Load Unload A.Queue</code>: Giảm từ <s class="text-red-400">23.37 xe (55.78p)</s> xuống <b class="text-emerald-400">4.2 xe (11.5p)</b>.<br>
+                    • Lối ra nối thẳng vào <b>Đường nhánh 2 làn (Slip Road)</b>, thoát cảng trong <b>52 phút</b>.
+                  </div>
+                </div>
+
+                <div class="bg-slate-900 p-3.5 rounded-xl border border-slate-700">
+                  <div class="flex justify-between items-center mb-1.5">
+                    <span class="font-black text-xs text-white">TERMINAL B (CITPL - 22 Vị trí Cẩu)</span>
+                    <span class="text-cyan-400 font-black text-xs">15/22 Cẩu (68.4%)</span>
+                  </div>
+                  <div class="w-full bg-slate-700 h-3 rounded-full overflow-hidden mb-2">
+                    <div class="bg-cyan-500 h-full" style="width: 68.4%"></div>
+                  </div>
+                  <div class="text-[11px] text-slate-300">
+                    • Hàng đợi <code>Load Unload B.Queue</code>: <b class="text-cyan-400">3.46 xe</b> (Ổn định).<br>
+                    • Không còn bị hàng đợi của Terminal A chặn ngang đường vào như hiện trạng cũ.
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Lịch trực xoay ca 12h/17h/20h & Nhật ký đồng bộ trực tiếp từ App -->
+            <div class="bg-slate-800/80 border border-slate-700 rounded-2xl p-4">
+              <div class="flex justify-between items-center border-b border-slate-700 pb-2.5 mb-3">
+                <h3 class="text-sm font-black text-emerald-300 uppercase">
+                  <i class="fa-solid fa-user-clock mr-1.5"></i>3. Lịch Trực Xoay Ca Gối Đầu (12h / 17h / 20h) & Nhật Ký Đặt Lịch
+                </h3>
+                <span class="text-[10px] bg-emerald-900 text-emerald-200 px-2 py-0.5 rounded font-bold">SyR-3.1, 3.2</span>
+              </div>
+
+              <div class="grid grid-cols-3 gap-2.5 mb-3 text-center text-xs">
+                <div class="bg-slate-900 p-2.5 rounded-xl border border-emerald-500/40">
+                  <div class="font-black text-amber-300">Ca Nghỉ Trưa 12:00–12:30</div>
+                  <div class="text-[11px] text-emerald-400 font-extrabold mt-0.5">✓ Xoay ca: Mở 2/3 Bốt (67%)</div>
+                  <div class="text-[10px] text-slate-400">Xóa bỏ Capacity = 0</div>
+                </div>
+                <div class="bg-slate-900 p-2.5 rounded-xl border border-emerald-500/40">
+                  <div class="font-black text-amber-300">Ca Chiều 17:00–17:30</div>
+                  <div class="text-[11px] text-emerald-400 font-extrabold mt-0.5">✓ Xoay ca: Mở 4/5 Bốt (80%)</div>
+                  <div class="text-[10px] text-slate-400">Xóa bỏ Capacity = 0</div>
+                </div>
+                <div class="bg-slate-900 p-2.5 rounded-xl border border-emerald-500/40">
+                  <div class="font-black text-amber-300">Ca Tối 20:00–20:30</div>
+                  <div class="text-[11px] text-emerald-400 font-extrabold mt-0.5">✓ Xoay ca: Mở 2/3 Bốt (67%)</div>
+                  <div class="text-[10px] text-slate-400">Xóa bỏ Capacity = 0</div>
+                </div>
+              </div>
+
+              <!-- Bảng Nhật ký xe vừa đặt từ App ở Tab 1 (TỰ ĐỘNG CẬP NHẬT DÒNG ĐẦU TIÊN) -->
+              <div class="bg-slate-900 rounded-xl p-3 border border-slate-700">
+                <div class="flex justify-between items-center text-[11px] font-extrabold text-blue-300 mb-1.5">
+                  <span><i class="fa-solid fa-bolt mr-1 text-amber-400"></i>DANH SÁCH XE ĐỒNG BỘ TỨC THỜI TỪ APP TÀI XẾ (REAL-TIME LOG):</span>
+                  <span class="text-[10px] text-emerald-400">Khớp 100% với Màn hình 1-2-3</span>
+                </div>
+                <div id="liveBookingLog" class="space-y-1.5 text-[11px] max-h-32 overflow-y-auto">
+                  <!-- Dòng Live Preview luôn tự động khớp với lựa chọn hiện tại bên Tab 1 -->
+                  <div id="activeSyncRow" class="flex justify-between items-center bg-emerald-950/80 border border-emerald-400 px-3 py-2 rounded-lg">
+                    <span id="activeSyncLeft" class="font-black text-white">PASS-889 | Xe: TN-01-CH-4829 (Loại 1: Cont chuẩn - Có hàng)</span>
+                    <span id="activeSyncRight" class="text-emerald-300 font-extrabold">Vào GATE 0 (RFID) → Terminal A → Slip Road (52p)</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    // ==================== BẢNG ÁNH XẠ CHUẨN: BIỂN SỐ <-> LOẠI XE ====================
+    const PLATE_BY_TYPE = {
+      1: 'TN-01-CH-4829',
+      2: 'TN-04-AB-9012',
+      3: 'TN-09-RORO-88'
+    };
+
+    const TYPE_NAME_SHORT = {
+      1: 'Loại 1: Cont chuẩn 65%',
+      2: 'Loại 2: Liên bến A↔B 20%',
+      3: 'Loại 3: Ro-Ro/Bồn dầu 15%'
+    };
+
+    // ==================== BIẾN TRẠNG THÁI TOÀN CỤC ====================
+    let state = {
+      plate: 'TN-01-CH-4829',
+      truckType: 1,       // 1 = Cont chuẩn (65%), 2 = Chuyển bến A-B (20%), 3 = Ro-Ro/Dầu (15%)
+      isLoad: 1,          // 1 = Có hàng, 0 = Xe rỗng
+      dest: 'TermA',      // 'TermA', 'TermB', 'Yards'
+      docValid: true,     // true = Hồ sơ hợp lệ, false = Lỗi 3%-13% Trouble Transaction
+      contReady: true,    // true = Đã hạ bãi (Xanh), false = Chưa sẵn sàng (Đỏ)
+      slotMode: 'day',    // 'day' (14:00-15:00) hoặc 'night' (22:00-05:00)
+      dayCount: 42,
+      nightCount: 18,
+      gate0Total: 684,
+      gate2Total: 357,
+      gate10Total: 214,
+      passSeq: 889,
+      allScreensVisible: true // Mặc định hiển thị cả 3 màn hình để dễ chụp ảnh & theo dõi
+    };
+
+    // ==================== CHUYỂN TAB CHÍNH (APP TÀI XẾ vs WEB ĐIỀU ĐỘ) ====================
+    function switchMainTab(tab) {
+      const secDriver = document.getElementById('sectionDriver');
+      const secOp = document.getElementById('sectionOperator');
+      const btn1 = document.getElementById('mainTab1');
+      const btn2 = document.getElementById('mainTab2');
+
+      if (tab === 'driver') {
+        secDriver.classList.remove('hidden');
+        secOp.classList.add('hidden');
+        btn1.className = "flex-1 lg:flex-initial flex items-center justify-center gap-2.5 px-5 py-3 rounded-xl font-extrabold text-xs md:text-sm bg-blue-600 text-white shadow-lg shadow-blue-600/30 border border-blue-400 transition";
+        btn2.className = "flex-1 lg:flex-initial flex items-center justify-center gap-2.5 px-5 py-3 rounded-xl font-extrabold text-xs md:text-sm bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-600 transition relative";
+      } else {
+        secDriver.classList.add('hidden');
+        secOp.classList.remove('hidden');
+        btn2.className = "flex-1 lg:flex-initial flex items-center justify-center gap-2.5 px-5 py-3 rounded-xl font-extrabold text-xs md:text-sm bg-blue-600 text-white shadow-lg shadow-blue-600/30 border border-blue-400 transition relative";
+        btn1.className = "flex-1 lg:flex-initial flex items-center justify-center gap-2.5 px-5 py-3 rounded-xl font-extrabold text-xs md:text-sm bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-600 transition";
+      }
+    }
+
+    // ==================== CHUYỂN BƯỚC 1 - 2 - 3 TRÊN ĐIỆN THOẠI ====================
+    function goToStep(stepNum) {
+      if (stepNum > 1 && !state.docValid) {
+        const box = document.getElementById('docStatusBox');
+        box.classList.add('scale-105');
+        setTimeout(() => box.classList.remove('scale-105'), 250);
+        return;
+      }
+
+      if (state.allScreensVisible) return;
+
+      document.getElementById('screenStep1').classList.toggle('hidden', stepNum !== 1);
+      document.getElementById('screenStep2').classList.toggle('hidden', stepNum !== 2);
+      document.getElementById('screenStep3').classList.toggle('hidden', stepNum !== 3);
+
+      [1, 2, 3].forEach(n => {
+        const btn = document.getElementById('stepTab' + n);
+        if (n === stepNum) {
+          btn.className = "py-2 px-2 rounded-xl font-extrabold text-xs bg-blue-600 text-white shadow";
+        } else {
+          btn.className = "py-2 px-2 rounded-xl font-bold text-xs text-slate-400 hover:text-white";
+        }
+      });
+    }
+
+    function togglePhoneViewMode() {
+      state.allScreensVisible = !state.allScreensVisible;
+      const s1 = document.getElementById('screenStep1');
+      const s2 = document.getElementById('screenStep2');
+      const s3 = document.getElementById('screenStep3');
+      const wizardBar = document.getElementById('wizardStepBar');
+      const modeText = document.getElementById('viewModeText');
+
+      if (state.allScreensVisible) {
+        s1.classList.remove('hidden');
+        s2.classList.remove('hidden');
+        s3.classList.remove('hidden');
+        wizardBar.classList.add('hidden');
+        modeText.innerText = "Thu gọn về 1 Điện thoại ở giữa";
+      } else {
+        wizardBar.classList.remove('hidden');
+        modeText.innerText = "Xem cả 3 màn hình (Chụp ảnh Word)";
+        goToStep(1);
+      }
+    }
+
+    // ==================== TƯƠNG TÁC BƯỚC 1: TỰ ĐỘNG KHỚP BIỂN SỐ <-> LOẠI XE ====================
+    function selectTruckType(typeNum) {
+      state.truckType = typeNum;
+      state.plate = PLATE_BY_TYPE[typeNum]; // Tự động gán đúng biển số xe tương ứng!
+
+      // Cập nhật giao diện 3 nút Biển số ở trên cùng Màn hình 1
+      const plateLabels = {
+        1: 'TN-01-CH-4829<br><span class="text-[9px] font-semibold">(Cont Loại 1)</span>',
+        2: 'TN-04-AB-9012<br><span class="text-[9px] font-semibold">(Liên bến L2)</span>',
+        3: 'TN-09-RORO-88<br><span class="text-[9px] font-semibold">(Ro-Ro/Dầu L3)</span>'
+      };
+
+      [1, 2, 3].forEach(n => {
+        const pBtn = document.getElementById('plateBtn' + n);
+        const card = document.getElementById('cardType' + n);
+        const icon = document.getElementById('checkType' + n);
+
+        if (n === typeNum) {
+          pBtn.className = "py-1.5 px-1.5 rounded-xl border-2 border-blue-600 bg-blue-50 font-black text-[10px] text-blue-900 shadow-sm transition";
+          pBtn.innerHTML = plateLabels[n];
+          card.classList.add('selected');
+          card.classList.remove('border-slate-200');
+          icon.className = "fa-solid fa-circle-check text-blue-600 text-base";
+        } else {
+          pBtn.className = "py-1.5 px-1.5 rounded-xl border border-slate-300 bg-slate-50 font-bold text-[10px] text-slate-600 transition";
+          pBtn.innerHTML = plateLabels[n];
+          card.classList.remove('selected');
+          card.classList.add('border-slate-200');
+          icon.className = "fa-regular fa-circle text-slate-300 text-base";
+        }
+      });
+
+      syncAllScreensAndDashboard();
+    }
+
+    function selectLoadState(loadVal) {
+      state.isLoad = loadVal;
+      const b1 = document.getElementById('toggleLoad1');
+      const b0 = document.getElementById('toggleLoad0');
+      if (loadVal === 1) {
+        b1.className = "py-2 px-3 rounded-xl bg-blue-600 text-white font-black text-xs shadow flex items-center justify-center gap-1.5 transition";
+        b0.className = "py-2 px-3 rounded-xl text-slate-700 font-bold text-xs flex items-center justify-center gap-1.5 transition";
+      } else {
+        b0.className = "py-2 px-3 rounded-xl bg-blue-600 text-white font-black text-xs shadow flex items-center justify-center gap-1.5 transition";
+        b1.className = "py-2 px-3 rounded-xl text-slate-700 font-bold text-xs flex items-center justify-center gap-1.5 transition";
+      }
+      syncAllScreensAndDashboard();
+    }
+
+    function selectDestination(destCode) {
+      state.dest = destCode;
+      const map = { 'TermA': 'destCardA', 'TermB': 'destCardB', 'Yards': 'destCardY' };
+      Object.keys(map).forEach(k => {
+        const el = document.getElementById(map[k]);
+        if (k === destCode) {
+          el.classList.add('selected');
+          el.classList.remove('border-slate-200');
+        } else {
+          el.classList.remove('selected');
+          el.classList.add('border-slate-200');
+        }
+      });
+      syncAllScreensAndDashboard();
+    }
+
+    // ==================== CÔNG TẮC GIẢ LẬP KỊCH BẢN DEMO ====================
+    function toggleSimDoc() {
+      state.docValid = !state.docValid;
+      const simBtn = document.getElementById('simDocBtn');
+      const docBox = document.getElementById('docStatusBox');
+      const nextBtn = document.getElementById('btnStep1Next');
+
+      if (state.docValid) {
+        simBtn.className = "flex items-center gap-2 px-3.5 py-2 rounded-xl font-extrabold text-xs bg-emerald-500/20 border-2 border-emerald-500 text-emerald-300 transition";
+        simBtn.innerHTML = `<i class="fa-solid fa-toggle-on text-base"></i><span>Kịch bản Chứng từ: <b>HỢP LỆ (XANH)</b></span>`;
+
+        docBox.className = "p-2.5 rounded-2xl bg-emerald-50 border-2 border-emerald-500 text-emerald-950 shadow-sm";
+        docBox.innerHTML = `
+          <div class="flex items-center justify-between">
+            <span class="font-black text-xs text-emerald-700 flex items-center gap-1.5">
+              <i class="fa-solid fa-circle-check text-sm"></i> [XANH LÁ] HỒ SƠ e-DO HỢP LỆ
+            </span>
+            <span class="text-[10px] bg-emerald-200 text-emerald-900 px-2 py-0.5 rounded-full font-extrabold">Pass 2 Lớp</span>
+          </div>
+          <p class="text-[10px] mt-1 leading-snug font-medium">
+            Đã xác thực chữ ký Hải quan & EIR trước 120 phút (Không thuộc nhóm 3%–13% lỗi Trouble Transaction).
+          </p>`;
+
+        nextBtn.disabled = false;
+        nextBtn.className = "w-full py-2.5 rounded-2xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-black text-xs shadow-lg flex items-center justify-center gap-2 transition";
+        nextBtn.innerHTML = `<span>TIẾP TỤC QUA BƯỚC 2: CHỌN GIỜ HẸN</span><i class="fa-solid fa-arrow-right"></i>`;
+      } else {
+        simBtn.className = "flex items-center gap-2 px-3.5 py-2 rounded-xl font-extrabold text-xs bg-red-500/20 border-2 border-red-500 text-red-300 transition";
+        simBtn.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-base"></i><span>Kịch bản Chứng từ: <b>BÁO LỖI 3%–13% (ĐỎ)</b></span>`;
+
+        docBox.className = "p-2.5 rounded-2xl bg-red-50 border-2 border-red-600 text-red-950 shadow-md";
+        docBox.innerHTML = `
+          <div class="flex items-center justify-between">
+            <span class="font-black text-xs text-red-700 flex items-center gap-1.5">
+              <i class="fa-solid fa-ban text-sm"></i> [CẢNH BÁO ĐỎ] HỒ SƠ LỖI (TROUBLE TRANSACTION)
+            </span>
+            <span class="text-[10px] bg-red-600 text-white px-2 py-0.5 rounded-full font-extrabold">Đã chặn từ xa</span>
+          </div>
+          <p class="text-[10px] mt-1 leading-snug font-bold text-red-900">
+            "Thiếu chữ ký Hải quan trên e-DO – Vui lòng bổ sung từ xa, không di chuyển đến cổng tránh gây kẹt bốt 5–60 phút!"
+          </p>`;
+
+        nextBtn.disabled = true;
+        nextBtn.className = "w-full py-2.5 rounded-2xl bg-red-300 text-red-900 font-black text-xs cursor-not-allowed flex items-center justify-center gap-2";
+        nextBtn.innerHTML = `<i class="fa-solid fa-lock"></i> ĐÃ KHÓA ĐẶT LỊCH DO LỖI CHỨNG TỪ`;
+      }
+      syncAllScreensAndDashboard();
+    }
+
+    function toggleSimCont() {
+      state.contReady = !state.contReady;
+      const btn = document.getElementById('simContBtn');
+      const card = document.getElementById('contTrafficCard');
+      const badge = document.getElementById('contTrafficBadge');
+      const loc = document.getElementById('contLocationText');
+      const note = document.getElementById('contSubNote');
+      const confirmBtn = document.getElementById('btnConfirmPass');
+
+      if (state.contReady) {
+        btn.className = "flex items-center gap-2 px-3.5 py-2 rounded-xl font-extrabold text-xs bg-emerald-500/20 border-2 border-emerald-500 text-emerald-300 transition";
+        btn.innerHTML = `<i class="fa-solid fa-box-open text-base"></i><span>Trạng thái Cont: <b>ĐÃ HẠ BÃI (XANH)</b></span>`;
+
+        card.className = "p-3 rounded-2xl bg-emerald-50 border-2 border-emerald-500 shadow-sm";
+        badge.className = "px-2 py-0.5 bg-emerald-600 text-white font-black rounded-full text-[10px]";
+        badge.innerText = "[XANH] CHO PHÉP KHỞI HÀNH";
+        loc.className = "text-[11px] font-bold text-emerald-900 mt-0.5";
+        note.className = "text-[10px] text-emerald-800 mt-1 font-medium";
+        note.innerText = "✓ Hàng đã sẵn sàng bốc xếp. Tài xế được phép chọn khung giờ vào cảng.";
+
+        confirmBtn.disabled = false;
+        confirmBtn.className = "w-2/3 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black text-xs shadow-lg flex items-center justify-center gap-1.5 transition";
+      } else {
+        btn.className = "flex items-center gap-2 px-3.5 py-2 rounded-xl font-extrabold text-xs bg-red-500/20 border-2 border-red-500 text-red-300 transition";
+        btn.innerHTML = `<i class="fa-solid fa-ship text-base"></i><span>Trạng thái Cont: <b>CHƯA HẠ BÃI (ĐỎ)</b></span>`;
+
+        card.className = "p-3 rounded-2xl bg-red-50 border-2 border-red-600 shadow-sm";
+        badge.className = "px-2 py-0.5 bg-red-600 text-white font-black rounded-full text-[10px]";
+        badge.innerText = "[ĐỎ] CHƯA SẴN SÀNG";
+        loc.className = "text-[11px] font-bold text-red-900 mt-0.5";
+        loc.innerText = "CONTAINER VẪN ĐANG TRÊN TÀU (CHƯA HẠ BÃI)";
+        note.className = "text-[10px] text-red-800 mt-1 font-bold";
+        note.innerText = "✗ Ngăn tài xế chạy đến sớm đỗ tràn lan trên 7 tuyến đường nội bộ!";
+
+        confirmBtn.disabled = true;
+        confirmBtn.className = "w-2/3 py-2.5 rounded-2xl bg-red-300 text-red-900 font-black text-xs cursor-not-allowed flex items-center justify-center gap-1.5";
+      }
+      syncAllScreensAndDashboard();
+    }
+
+    // ==================== TƯƠNG TÁC BƯỚC 2 (CHỌN KHUNG GIỜ) ====================
+    function chooseTimeSlot(mode) {
+      state.slotMode = mode;
+      const dayCard = document.getElementById('slotCardDay');
+      const nightCard = document.getElementById('slotCardNight');
+      const dayStatus = document.getElementById('daySlotStatusText');
+      const alertBox = document.getElementById('step2AlertBox');
+      alertBox.classList.add('hidden');
+
+      if (mode === 'day') {
+        dayCard.className = "touch-card p-3 rounded-2xl border-2 border-emerald-600 bg-emerald-50 shadow-sm";
+        nightCard.className = "touch-card p-3 rounded-2xl border-2 border-amber-300 bg-white opacity-90";
+        dayStatus.innerText = "✓ ĐANG CHỌN — Đã đồng bộ sang Vé e-Pass";
+      } else {
+        nightCard.className = "touch-card p-3 rounded-2xl border-2 border-indigo-600 bg-indigo-50 shadow-md";
+        dayCard.className = "touch-card p-3 rounded-2xl border-2 border-emerald-300 bg-white opacity-90";
+        dayStatus.innerText = "Chạm để đổi về Ca Ngày (14:00–15:00)";
+      }
+      syncAllScreensAndDashboard();
+    }
+
+    function notifyLockedPeak() {
+      const alertBox = document.getElementById('step2AlertBox');
+      alertBox.className = "block p-2 rounded-xl text-[10px] font-extrabold text-center bg-red-100 text-red-800 border border-red-400";
+      alertBox.innerText = "✗ Khung 17:00–18:00 đã khóa cứng ở mức 60/60 xe để chặn đỉnh 103 xe/h! Hãy chọn khung 14h–15h hoặc Ca đêm.";
+    }
+
+    // ==================== HÀM ĐỒNG BỘ TỨC THỜI CẢ 3 MÀN HÌNH APP & WEB DASHBOARD ====================
+    function syncAllScreensAndDashboard() {
+      const loadStr = state.isLoad === 1 ? "CÓ HÀNG" : "XE RỖNG";
+      const passCode = `PASS-${state.passSeq}`;
+
+      // 1. Cập nhật Thẻ tín hiệu Bến bãi ở Màn hình 2 theo đúng Điểm đến & Loại xe
+      if (state.contReady) {
+        const contTitle = document.getElementById('contCodeTitle');
+        const locText = document.getElementById('contLocationText');
+        if (state.truckType === 3) {
+          contTitle.innerText = "Lô hàng: RORO-CAR-88 / OIL-TANK";
+        } else {
+          contTitle.innerText = "Mã Cont: MSCU-928374-0";
+        }
+
+        if (state.dest === 'TermA') {
+          locText.innerText = "ĐÃ HẠ BÃI TẠI TERMINAL A (Cẩu số 14/30)";
+        } else if (state.dest === 'TermB') {
+          locText.innerText = "ĐÃ HẠ BÃI TẠI TERMINAL B (Cẩu số 08/22)";
+        } else {
+          locText.innerText = "SẴN SÀNG TẠI YARDS & DOCKS (Ambedkar Dock)";
+        }
+      }
+
+      // 2. Cập nhật Header Màn hình 3 & Mã QR
+      document.getElementById('passHeaderPlate').innerText = `XE: ${state.plate} (${loadStr})`;
+      document.getElementById('qrPassId').innerText = passCode;
+
+      // 3. Nếu đang giả lập Lỗi chứng từ -> Báo đỏ khóa vé ở Màn hình 3 & Web
+      const rfidBadge = document.getElementById('passRfidBadge');
+      if (!state.docValid) {
+        rfidBadge.className = "text-red-600 font-black";
+        rfidBadge.innerHTML = `<i class="fa-solid fa-ban"></i> CHẶN CẤP VÉ (LỖI e-DO)`;
+        document.getElementById('opLastSyncedTruck').innerText = `${state.plate} → ĐÃ CHẶN TỪ XA (LỖI EIR)`;
+        document.getElementById('activeSyncLeft').innerText = `BLOCKED | Xe: ${state.plate} (${TYPE_NAME_SHORT[state.truckType]})`;
+        document.getElementById('activeSyncRight').className = "text-red-400 font-extrabold";
+        document.getElementById('activeSyncRight').innerText = `Chặn từ xa (Nhóm 3%–13% Trouble Transaction)`;
+        return;
+      } else {
+        rfidBadge.className = "text-emerald-600 font-extrabold";
+        rfidBadge.innerHTML = `<i class="fa-solid fa-wifi"></i> RFID UHF ACTIVE`;
+      }
+
+      // 4. Xác định Cổng vào chỉ định tự động (Gate 0, Gate 2, Gate 10)
+      const gateBox = document.getElementById('smartGateBox');
+      const gateTitle = document.getElementById('smartGateTitle');
+      const gateSub = document.getElementById('smartGateSub');
+
+      let assignedGateName = "Gate 0 In";
+      let shortGateWeb = "GATE 0 (RFID)";
+
+      // Highlight thẻ cổng tương ứng bên Tab 2 Web Điều độ
+      document.getElementById('opCardGate0').className = "bg-slate-900 border border-slate-700 rounded-xl p-3.5 transition";
+      document.getElementById('opCardGate2').className = "bg-slate-900 border border-slate-700 rounded-xl p-3.5 transition";
+      document.getElementById('opCardGate10').className = "bg-slate-900 border border-slate-700 rounded-xl p-3.5 transition";
+
+      if (state.slotMode === 'night') {
+        assignedGateName = "Gate 10 In (Ca đêm)";
+        shortGateWeb = "GATE 10 (Ca đêm 22h-05h)";
+        gateBox.className = "flex-1 p-2.5 rounded-xl bg-indigo-50 border-2 border-indigo-600 text-indigo-950";
+        gateTitle.className = "font-black text-xs text-indigo-900 mt-0.5";
+        gateTitle.innerText = "VÀO GATE 10 (Luồng ưu tiên ca đêm)";
+        gateSub.innerText = "22:00–05:00 | Chờ dự kiến < 1 phút (AMOD(TNOW,24)>=22)";
+        document.getElementById('opCardGate10').className = "bg-slate-900 border-2 border-indigo-400 rounded-xl p-3.5 shadow-lg transition";
+      } else if (state.truckType === 3) {
+        assignedGateName = "Gate 2 In (35 giây)";
+        shortGateWeb = "GATE 2 (35s - Hàng đợi 0.32)";
+        gateBox.className = "flex-1 p-2.5 rounded-xl bg-emerald-50 border-2 border-emerald-600 text-emerald-950";
+        gateTitle.className = "font-black text-xs text-emerald-900 mt-0.5";
+        gateTitle.innerText = "VÀO GATE 2 (Hàng đợi: 0.32 xe - Qua cổng: 35 giây)";
+        gateSub.innerText = "Luồng ưu tiên Xe chuyên dụng Ro-Ro / Bồn dầu (15%)";
+        document.getElementById('opCardGate2').className = "bg-slate-900 border-2 border-emerald-400 rounded-xl p-3.5 shadow-lg transition";
+      } else {
+        assignedGateName = "Gate 0 In (Làn RFID)";
+        shortGateWeb = "GATE 0 (Làn RFID ≤ 1.0p)";
+        gateBox.className = "flex-1 p-2.5 rounded-xl bg-blue-50 border-2 border-blue-600 text-blue-950";
+        gateTitle.className = "font-black text-xs text-blue-900 mt-0.5";
+        gateTitle.innerText = "VÀO GATE 0 – Làn đọc thẻ RFID tự động (≤ 1.0 phút)";
+        gateSub.innerText = "Khung hẹn: 14:00–15:00 | Xóa hệ số trễ 2.5x của nhân viên";
+        document.getElementById('opCardGate0').className = "bg-slate-900 border-2 border-emerald-400 rounded-xl p-3.5 shadow-lg transition";
+      }
+
+      // 5. Cập nhật Thanh lộ trình từng chặng (Step-by-step Route) khớp 100% với Điểm đến
+      document.getElementById('stepRoute1').innerHTML = `1. <b>${assignedGateName}</b> (Quét RFID tự động)`;
+
+      const s3Title = document.getElementById('stepRoute3Title');
+      const s3Sub = document.getElementById('stepRoute3Sub');
+      const s4 = document.getElementById('stepRoute4');
+      const timeBadge = document.getElementById('routeTotalTimeBadge');
+      let destNameWeb = "Terminal A → Slip Road (52p)";
+
+      if (state.truckType === 2) {
+        document.getElementById('stepRoute2').innerHTML = `2. <b>Booth A In</b> → Cẩu #14 → Chuyển liên bến <b>Route 3_B</b> sang Terminal B`;
+        s3Title.innerText = "3. Hoàn tất 2 bến → Rẽ ĐƯỜNG NHÁNH 2 LÀN (SLIP ROAD)";
+        s3Sub.innerText = "Giữ giãn cách 34 giây giữa 2 bến A ↔ B, tránh xung đột giao cắt";
+        s4.innerHTML = `4. Qua <b>Staggered Booth #3</b> → <b>Gate 0 Exit</b>`;
+        timeBadge.innerText = "Thoát cảng: 52 phút";
+        destNameWeb = "Liên bến A↔B → Slip Road";
+      } else if (state.dest === 'TermA') {
+        document.getElementById('stepRoute2').innerHTML = `2. <b>Booth A In</b> → Vị trí Cẩu #14/30 → <b>Booth A Out</b>`;
+        s3Title.innerText = "3. Rẽ vào ĐƯỜNG NHÁNH 2 LÀN (SLIP ROAD)";
+        s3Sub.innerText = "Tách khỏi luồng xếp hàng vào Terminal B (Giảm từ 1h45p xuống 52p)";
+        s4.innerHTML = `4. Bốt kiểm tra so le <b>Staggered Booth #3</b> → <b>Gate 0 Exit</b>`;
+        timeBadge.innerText = "Tổng thoát cảng: 52 phút";
+        destNameWeb = "Terminal A → Slip Road (52p)";
+      } else if (state.dest === 'TermB') {
+        document.getElementById('stepRoute2').innerHTML = `2. Đi tuyến <b>Route 2</b> → <b>Booth B In</b> → Vị trí Cẩu #08/22 → <b>Booth B Out</b>`;
+        s3Title.innerText = "3. Lưu thông thông suốt (Nhờ xe Term A đã tách sang Slip Road)";
+        s3Sub.innerText = "Không còn bị hàng đợi của Terminal A chặn ngang lối vào";
+        s4.innerHTML = `4. Bốt kiểm tra so le <b>Staggered Booth #4</b> → <b>Gate 0 Exit</b>`;
+        timeBadge.innerText = "Hàng đợi B: 3.46 xe";
+        destNameWeb = "Terminal B → Staggered Booth #4";
+      } else {
+        document.getElementById('stepRoute2').innerHTML = `2. Đi thẳng vào <b>Yards & Docks (Tuyến 5 - Ambedkar/Jawahar)</b>`;
+        s3Title.innerText = "3. Tách biệt hoàn toàn khỏi khu vực Cẩu Container A & B";
+        s3Sub.innerText = "Phân luồng 36% xe nhỏ/bồn dầu đi thẳng vào bến phụ";
+        s4.innerHTML = `4. Định tuyến thoát ra qua <b>Gate 2 Exit</b> (86% nhánh Ambedkar)`;
+        timeBadge.innerText = "Qua cổng: 35 giây";
+        destNameWeb = "Yards & Docks → Gate 2 Exit";
+      }
+
+      // 6. ĐỒNG BỘ TỨC THỜI SANG TAB 2 (WEB ĐIỀU ĐỘ CẢNG) NGAY LẬP TỨC!
+      document.getElementById('opLastSyncedTruck').innerText = `${state.plate} → ${shortGateWeb}`;
+      document.getElementById('activeSyncLeft').innerText = `${passCode} | Xe: ${state.plate} (${TYPE_NAME_SHORT[state.truckType]} - ${loadStr})`;
+      document.getElementById('activeSyncRight').className = "text-emerald-300 font-extrabold";
+      document.getElementById('activeSyncRight').innerText = `Vào ${shortGateWeb} → ${destNameWeb}`;
+    }
+
+    // ==================== KHI BẤM NÚT "NHẬN VÉ e-PASS MỚI (+1 XE)" Ở BƯỚC 2 ====================
+    function issueSmartPass() {
+      if (!state.docValid || !state.contReady) return;
+
+      state.passSeq++;
+      const passId = `PASS-${state.passSeq}`;
+
+      // Tăng số lượng xe trong khung giờ đã chọn
+      if (state.slotMode === 'day' && state.dayCount < 60) {
+        state.dayCount++;
+        const pct = Math.round((state.dayCount / 60) * 100);
+        document.getElementById('daySlotCountBadge').innerText = `XANH: ${state.dayCount} / 60 XE`;
+        document.getElementById('daySlotProgressBar').style.width = `${pct}%`;
+        document.getElementById('dayRemainingText').innerText = `Còn ${60 - state.dayCount} chỗ trống`;
+      } else if (state.slotMode === 'night' && state.nightCount < 60) {
+        state.nightCount++;
+        document.getElementById('nightSlotCountBadge').innerText = `MỞ GATE 10 (${state.nightCount}/60)`;
+      }
+
+      // Cộng số liệu tổng ở các cổng bên Tab 2 Web Điều độ
+      if (state.slotMode === 'night') {
+        state.gate10Total++;
+        document.getElementById('opGate10Count').innerText = `${state.gate10Total} xe Cont`;
+      } else if (state.truckType === 3) {
+        state.gate2Total++;
+        document.getElementById('opGate2Count').innerText = `${state.gate2Total} xe (33%)`;
+      } else {
+        state.gate0Total++;
+        document.getElementById('opGate0Count').innerText = `${state.gate0Total} xe (58%)`;
+      }
+
+      syncAllScreensAndDashboard();
+
+      // Lưu thêm 1 dòng lịch sử vào bảng Real-time Log bên Tab 2
+      const logContainer = document.getElementById('liveBookingLog');
+      const historyRow = document.createElement('div');
+      historyRow.className = "flex justify-between items-center bg-slate-800/90 border border-slate-700 px-3 py-1.5 rounded-lg";
+      historyRow.innerHTML = `
+        <span class="font-bold text-slate-200">${passId} | Đã xác nhận: ${state.plate} (${TYPE_NAME_SHORT[state.truckType]})</span>
+        <span class="text-blue-400 font-bold">${document.getElementById('activeSyncRight').innerText}</span>`;
+      logContainer.appendChild(historyRow);
+
+      // Báo thành công trên Màn hình 2
+      const alertBox = document.getElementById('step2AlertBox');
+      alertBox.className = "block p-2 rounded-xl text-[10px] font-extrabold text-center bg-emerald-100 text-emerald-900 border border-emerald-500";
+      alertBox.innerText = `✓ Đã cấp mã ${passId} cho xe ${state.plate} & đồng bộ sang Tab 2 Web Điều độ!`;
+
+      goToStep(3);
+    }
+
+    // ==================== ĐỒNG HỒ ĐẾM NGƯỢC 34 GIÂY CHẠY LIÊN TỤC ====================
+    let secLeft = 34;
+    setInterval(() => {
+      secLeft--;
+      if (secLeft < 1) secLeft = 34;
+      const el = document.getElementById('countdown34');
+      if (el) el.innerText = secLeft + "s";
+    }, 1000);
+
+    // Khởi chạy đồng bộ lần đầu
+    syncAllScreensAndDashboard();
+  </script>
+</body>
+</html>
